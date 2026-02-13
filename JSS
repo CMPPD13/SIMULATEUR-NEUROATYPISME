@@ -1,0 +1,95 @@
+// -------------------- Initialisation Three.js --------------------
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0,1.6,3);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.getElementById("world").appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enablePan = false;
+controls.enableZoom = false;
+
+// -------------------- Audio --------------------
+const listener = new THREE.AudioListener();
+camera.add(listener);
+const audioLoader = new THREE.AudioLoader();
+
+let tdahSounds = []; // sons de fond de classe
+let notificationSound; // son ponctuel
+
+// -------------------- Fonction charger GLB --------------------
+function loadGLB(path, position, scale, callback){
+    const loader = new THREE.GLTFLoader();
+    loader.load(path, function(gltf){
+        const obj = gltf.scene;
+        obj.position.copy(position);
+        obj.scale.set(scale, scale, scale);
+        scene.add(obj);
+
+        // Si animation
+        if(gltf.animations.length > 0){
+            const mixer = new THREE.AnimationMixer(obj);
+            gltf.animations.forEach(clip => mixer.clipAction(clip).play());
+            obj.userData.mixer = mixer;
+        }
+
+        callback(obj);
+    });
+}
+
+// -------------------- Démarrer TDAH --------------------
+function startTDAH(){
+    // Sons de fond en boucle
+    const classSoundsFiles = [
+        'sounds/tdah_bruit_classe1.mp3',
+        'sounds/tdah_bruit_classe2.mp3'
+    ];
+
+    classSoundsFiles.forEach(file => {
+        const sound = new THREE.Audio(listener);
+        audioLoader.load(file, function(buffer){
+            sound.setBuffer(buffer);
+            sound.setLoop(true);
+            sound.setVolume(0.5);
+            sound.play();
+        });
+        tdahSounds.push(sound);
+    });
+
+    // Son de notification ponctuel
+    notificationSound = new THREE.Audio(listener);
+    audioLoader.load('sounds/tdah_notification.mp3', function(buffer){
+        notificationSound.setBuffer(buffer);
+        notificationSound.setLoop(false);
+        notificationSound.setVolume(0.7);
+    });
+
+    // Charger le modèle classe
+    loadGLB('models/tdah_class.glb', new THREE.Vector3(0,0,0), 1, function(obj){
+        console.log("Classe TDAH chargée !");
+    });
+
+    // Exemple : déclencher notification toutes les 8 secondes
+    setInterval(() => {
+        if(notificationSound) notificationSound.play();
+    }, 8000);
+}
+
+// -------------------- Animation --------------------
+const clock = new THREE.Clock();
+function animate(){
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+
+    scene.traverse(function(child){
+        if(child.userData.mixer) child.userData.mixer.update(delta);
+    });
+
+    renderer.render(scene, camera);
+}
+animate();
+
+// -------------------- Bouton --------------------
+document.getElementById("startTdah").addEventListener("click", startTDAH);
